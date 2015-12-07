@@ -1,2 +1,292 @@
 # letsencrypt-json-jwk-to-openssl-der
+(yes, I realize that's redundant, but keywords ftw)
+
 (Re)construct OpenSSL-compatible RSA public and private keys from integer RSA parameters
+
+## ;tldr
+
+The letsencrypt client requires root. letsencrypt-nosudo doesn't. letsencrypt generates
+and stores cryptographic keys in JSON, but letsencrypt-nosudo uses OpenSSL PEM files instead.
+These scripts create standard DER-encoded OpenSSL-compatible RSA public and private keys
+from the letsencrypt generated ones (which can easily be converted to PEM).
+
+
+## Background
+
+Let's Encrypt (https://letsencrypt.org/) is a really cool project that provides 100% free
+SSL certificates and infrastructure around renewing and revoking those certificates.
+
+Unfortunately, their default client
+https://github.com/letsencrypt/letsencrypt
+https://letsencrypt.readthedocs.org/en/latest/
+requires that you run it as root so it can temporarily start a web server on a privileged
+port (80 or 443). This is necessary to verify that you actually control the domain for
+which you've requested a certificate.
+
+As a participant in the letsencrypt beta, I ran the letsencrypt client in a VM as root
+to obtain my first free SSL certificate. Now that letsencrypt is publicly available,
+I wanted a better solution that I would feel comfortable running on additional hosts.
+
+letsencrypt-nosudo
+https://github.com/diafygi/letsencrypt-nosudo/
+solves this problem by providing scripts that break up the process so that you
+need only run a single command as root.
+
+The problem I ran into was that letsencrypt-nosudo expects you to have a letsencrypt RSA
+certificate and private key in PEM format.
+
+I could have generated a new one, but I wasn't sure how letsencrypt would handle a
+different user trying to operate on a domain for which it had already signed a certificate.
+
+I knew the letsencrypt client stored some metadata on my system when I ran it. Upon
+further investigation, I discovered JSON files under
+/etc/letsencrypt/accounts/
+
+Looking at those JSON files, I saw that they contained what looked like RSA parameters.
+After several Internet searches, I was surprised that there didn't seem to be a good way
+to construct OpenSSL-compatible files directly from the RSA parameters. The format of
+PEM and DER files was always a bit of a mystery to me, so I decided that writing some
+scripts to do this would be a good learning experience. It definitely was.
+
+
+## How to use
+
+1.  Make sure you are on a compatible system.
+        You need Python (I used Python 2.7.10) and openssl (I used OpenSSL 1.0.2d-fips 9 Jul 2015)
+        python >= 2.6.x (3.x probably works, but I haven't tested)
+        openssl >= 1.0.x (maybe earlier versions work)
+2.  Install dependencies
+        pip install PyASN1
+3.  Find your private_key.json and regr.json files in /etc/letsencrypt/accounts/
+
+Reconstruct public key:
+4.  Run Python script:
+        python decode_public_key_json.py < regr.json > user.pub.der
+5.  Convert newly constructed DER file to PEM:
+        openssl rsa -pubin -inform DER -in user.pub.der -outform PEM -out user.pub.pem
+
+Reconstruct private key:
+6.  Run Python script:
+        python decode_private_key_json.py < private_key.json > user.key.der
+7.  Convert newly constructed DER file to PEM:
+        openssl rsa -inform DER -in user.key.der -outform PEM -out user.key.pem
+
+Reconstruct public key (alternative method):
+    As it turns out, all the parameters required for the public key are stored in the
+    private key too.
+        openssl rsa -in user.key.pem -pubout user.pub.pem
+
+8.  Move files into place.
+    letsencrypt-nosudo expects specific filenames because it generates commands
+    for you to copy and paste:
+        mv user.pub.pem user.pub
+        mv user.key.pem user.key
+
+9.  Run letsencrypt-nosudo!
+10. Profit.
+
+
+## Educational component
+
+This code might be interesting to anyone interested in cryptography or networking
+who knows how to use PEM/DER files but for whom their contents may be a mystery.
+
+Here are some things I learned along the way:
+
+PEM is a container format. It can contain pretty much anything, but it primarily used for
+cryptographic keys. PEM files can be concatenated. In fact, many programs expect you to
+do this (e.g. to configure a certificate chain). PEM files are designed to be somewhat
+human readable (for easy pasting into files and emails):
+
+$ openssl genrsa 1024 > sample-rsa-key.pem
+$ cat sample-rsa-key.pem
+-----BEGIN RSA PRIVATE KEY-----
+MIICXAIBAAKBgQDW98u3530CZIoofAty7tuVuMTkHS9cpkkjuIUYUXgFdodbM0go
+d/6YjP2R6w9Y9SciT+cK6vYX0psnSvxZXgqM/AB7ltKBHDqwLOu6n7tSD+hUm0qO
+qMoGxQzriMhJnFsCrz7xp5XpSVORWM3qiGGEGtKzfuIaxUrYPxQeHwxKaQIDAQAB
+AoGAPz5d1/gp5hdQMkL0V1cAkVbvzjDr6zUc1X6G4bWuOuU5Q1KeCxHqfFUWkOR3
++nL9lXGuhp7D0hRrAy9jeKNbNL8XcCRn9hN8UuMSuLXi2zrPRw048y6JKy8LrmoD
+MNhRzkOJrBAgGyL5s0txCwXxlcnq9O0VffFNQb/6Ze4XscUCQQDz7qpHlKHCjXkY
+3Ars93gvtJzz3dA2afwwzrly6ykY8yMiqn9VQsjRGrcb6ea8nfoUyGo0i4hROF1J
+Hpcxiwz7AkEA4ZpOK+jMW5i1w+lKiyof7m227i36B2iOSYiEFxctZhgVAykUA/Ww
+3ADYXSZr+7ajHG3a4CrL4WvqaFCOvdgg6wJBAJOCPOiCYftzb8pvrg+0arJ2hv8V
+oIZ3OvEM4aozuKuExDd/YPbfJu8EN7yiikx/P653r3nM8wcijY7c99MW4icCQD53
+/rtT2/pk/7e+yoBcarkXsjajjn8sqXGdFo5aQZzqgC7+2eb6yj0xErhAYlgxy1qc
+5KV71DaYLjEyVUQmK38CQFpd0KQr/Otp1lg8CdK/Toh6lpQGTbLKEcTCrdxsVMRb
+0rtwmjOV/iAPk9OWaYm332DIXqrmNh73CxG1oUTwuzE=
+-----END RSA PRIVATE KEY-----
+
+PEM files consist of one or more labeled sections.
+-----BEGIN ...-----
+-----END ...-----
+The section contains a base64-encoded DER-encoded object.
+
+DER is a binary format that can contain anything (more on that in a minute).
+
+There are several standards for cryptographic formats
+https://en.wikipedia.org/wiki/PKCS
+
+Unencrypted RSA public and private keys fall under PKCS1
+https://en.wikipedia.org/wiki/PKCS_1
+https://tools.ietf.org/html/rfc3447
+
+RSA uses the theorem that finding the prime factors of a large number
+is difficult for today's computers to ensure security. There are several
+parameters involved:
+https://tools.ietf.org/html/rfc3447#section-2
+
+These parameters, (e.g. n, e, p, q) are split across the public and private keys.
+Read the RFC for more information.
+
+The parameters are encoded into the public and private keys using DER.
+
+OpenSSL can convert between PEM and DER encodings:
+$ openssl rsa -inform PEM -in sample-rsa-key.pem -outform DER -out sample-rsa-key.der
+$ cat sample-rsa-key.der
+[omitted for clarity]
+
+A bit less readable. Let's look at the file as hex instead:
+$ xxd -p sample-rsa-key.der
+3082025c02010002818100daae2a596aaa08a3519d59c75c9b40ddc512ac
+303d85f696588ec79b36eb6b0d3118b78bc53467bcf978c952759607bdcd
+42a7499bae84083b537cf1563a8d71482f887da9459ae66b627a04e964ab
+554a383719f60e7823ada2c1d585d62367cdc87faf5e9906aca408dc46a4
+132bc15fc9581fc594332d816f5c5856b1b857020301000102818100a763
+4b8d584541096a6e8c8b3acaa83359277ae00e27dde1a575dd3a65267cb2
+0353cd2352d75354e68cdb65a0163064cb9a6a9cc06b2c2b74e5ea2c7d79
+a24b9ad3d47183439926a1ba2d95ff675b953b10293aa17ac727ef33b80c
+3883f4dd71c9eb107bd6097e1823e1948386b153fd15f8ccf80288f26e0c
+56a76e24bd01024100f0ba4047622a22538b2ccc393b185e044c0c6fd7c5
+2b6c1d45bab81be88c62e29c88f56f7ec11dba7acbcdac6382e357f89c54
+c2c4f93c6ed99697c40350b1d7024100e88dd64c2bfbc3503d4836436fce
+dc7f71911703053b7ddf74ed23cebfb2a2a4f37b9991304ac3dc50fb66b6
+310362a75faa07ea6585d8e198d59d9b955b5d8102402429868072b1aba8
+6b2ed69afe52a1c4f97ba0cd84140ad0b6e9dec06a85b451207cbe89fa3b
+9e70a603b9a8dce60baaea70e996bcaa4836cabf019b73780acf02405eb4
+4c5e0ed7636dccd7188a1401591869665dc9b41acb22f21a14a800b73db7
+1114f7b001cba0c19b15167a01b1d03e3b1e2245197d0d9aa9c3ec804cad
+bd8102402cac300c5ef22a709c5c79e1af01f229f5c6cc617acfe560d60c
+2d03e8ccfaaa9f594ebdf0c16f572ecb97a243bd6339b954873812498888
+522724069b8c8d8a
+
+All DER files are valid BER. DER, CER, and BER are formats of ASN.1 encoding.
+ASN.1 is a binary format used for encoding data to be transmitted over the wire.
+ASN.1 can be used to encode integers, strings, and other data types in a structured
+hierarchy. Think of it as a binary version of XML.
+
+OpenSSL can print out ASN.1 data in a more human readable way:
+$ openssl asn1parse -inform DER -in sample-rsa-key.der -i
+    0:d=0  hl=4 l= 604 cons: SEQUENCE          
+    4:d=1  hl=2 l=   1 prim:  INTEGER           :00
+    7:d=1  hl=3 l= 129 prim:  INTEGER           :D6F7CBB7E77D02648A287C0B72EEDB9...
+  139:d=1  hl=2 l=   3 prim:  INTEGER           :010001
+  144:d=1  hl=3 l= 128 prim:  INTEGER           :3F3E5DD7F829E617503242F45757009...
+  275:d=1  hl=2 l=  65 prim:  INTEGER           :F3EEAA4794A1C28D7918DC0AECF7782...
+  342:d=1  hl=2 l=  65 prim:  INTEGER           :E19A4E2BE8CC5B98B5C3E94A8B2A1FE...
+  409:d=1  hl=2 l=  65 prim:  INTEGER           :93823CE88261FB736FCA6FAE0FB46AB...
+  476:d=1  hl=2 l=  64 prim:  INTEGER           :3E77FEBB53DBFA64FFB7BECA805C6AB...
+  542:d=1  hl=2 l=  64 prim:  INTEGER           :5A5DD0A42BFCEB69D6583C09D2BF4E8...
+
+Here's an example of the corresponding public key to make the structured aspect more apparent:
+$ openssl rsa -inform DER -in sample-rsa-key.der -pubout -outform DER -out sample-rsa-key.pub.der
+$ openssl asn1parse -inform DER -in sample-rsa-key.pub.der -i
+    0:d=0  hl=3 l= 159 cons: SEQUENCE          
+    3:d=1  hl=2 l=  13 cons:  SEQUENCE          
+    5:d=2  hl=2 l=   9 prim:   OBJECT            :rsaEncryption
+   16:d=2  hl=2 l=   0 prim:   NULL              
+   18:d=1  hl=3 l= 141 prim:  BIT STRING
+
+d=depth, increased by new scope of SET or SEQUENCE
+hl=header length for tag + octets
+l=length in octets
+
+See that bit string? It's actually another DER-encoded object:
+$ openssl asn1parse -inform DER -in sample-rsa-key.pub.der -i -strparse 18
+    0:d=0  hl=3 l= 137 cons: SEQUENCE          
+    3:d=1  hl=3 l= 129 prim:  INTEGER           :D6F7CBB7E77D02648A287C0B72EEDB9...
+  135:d=1  hl=2 l=   3 prim:  INTEGER           :010001
+
+The -strparse <n> argument starts the parsing at an offset of 18 bytes.
+https://www.openssl.org/docs/manmaster/apps/asn1parse.html
+
+
+ASN.1 encoding is fairly straightforward. This Wikipedia page has the details:
+https://en.wikipedia.org/wiki/X.690#BER_encoding
+
+Let's dissect the bits in a public key. If you compare the hex dump of the DER-encoded key:
+$ xxd -p sample-rsa-key2.pub.der
+to the readable OpenSSL dump:
+$ openssl rsa -inform DER -in sample-rsa-key2.pub.der -noout -text
+you'll see that the DER file is encoded like this:
+
+00000000: 3082 0222 300d 0609 2a86 4886 f70d 0101
+00000010: 0105 0003 8202 0f00 3082 020a 0282 0201
+... modulus bits ...
+02 03
+... exponent bits ...
+
+Decoding byte by byte according to https://en.wikipedia.org/wiki/X.690#BER_encoding:
+
+30: SEQUENCE type
+82: length (long form) consists of next two octets
+02 22: length is 0x0222 == 546 octets
+
+contents of top level sequence:
+30: SEQUENCE type
+0d: length (short form, first bit ignored) is 0x0d == 13 octets
+
+contents of 2nd level sequence:
+06: OBJECT type
+09: length (short form, first bit ignored) is 0x09 == 9 octets
+
+2a 86 48 86 f7 0d 01 01 01
+(to be explained later)
+
+05: NULL type
+00: length (short form, first bit ignored) is 0x00 = 0 octets
+
+(end 2nd level sequence because we've read 13 octets)
+
+03: BIT STRING type
+82: length (long form) consists of next two octets
+02 0f: length is 527 octets
+
+00?
+
+bit string happens to be another BER-encoded object:
+30: SEQUENCE type
+82: length (long form) consists of next two octets
+02 0a: length is 0x020a == 522 octets
+02: INTEGER type
+82: length (long form) consists of next two octets
+02 01: length is 0x0201 == 513 octets
+... modulus bits ...
+
+02: INTEGER type
+03: length (short form, first bit ignored) is 0x03 == 3 bits
+... exponent bits ...
+
+
+Remember that magic 2a 86 48 86 f7 0d 01 01 01 sequence?
+It's the Object ID 1.2.840.113549.1.1.1 that represents RSA encryption.
+Here's the explanation for how that conversion works:
+http://crypto.stackexchange.com/questions/29115/how-is-oid-2a-86-48-86-f7-0d-parsed-as-1-2-840-113549
+
+
+This page shows how an RSA private key is encoded (it's actually simpler than the public key):
+http://etherhack.co.uk/asymmetric/docs/rsa_key_breakdown.html
+
+The PyASN1 Python module
+http://pyasn1.sourceforge.net/codecs.html
+can encode and decode PyASN1 in an object oriented way, so I used it to do the heavy lifting.
+
+
+## Future work
+
+Upon further research, the JSON format letsencrypt uses is actually a draft standard:
+https://tools.ietf.org/html/rfc7517
+JSON Web Key (JWK) seems much cleaner than the binary formats currently used by OpenSSL
+so hopefully it will become more widely used.
+
+These scripts could be generalized to operate on JWK JSON files instead of just the
+letsencrypt JSON files.
