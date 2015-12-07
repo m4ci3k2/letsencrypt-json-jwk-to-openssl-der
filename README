@@ -1,9 +1,9 @@
-# letsencrypt-json-jwk-to-openssl-der
+ letsencrypt-json-jwk-to-openssl-der
 (yes, I realize that's redundant, but keywords ftw)
 
 (Re)construct OpenSSL-compatible RSA public and private keys from integer RSA parameters
 
-## ;tldr
+;tldr
 
 The letsencrypt client requires root. letsencrypt-nosudo doesn't. letsencrypt generates
 and stores cryptographic keys in JSON, but letsencrypt-nosudo uses OpenSSL PEM files instead.
@@ -11,7 +11,7 @@ These scripts create standard DER-encoded OpenSSL-compatible RSA public and priv
 from the letsencrypt generated ones (which can easily be converted to PEM).
 
 
-## Background
+Background
 
 Let's Encrypt (https://letsencrypt.org/) is a really cool project that provides 100% free
 SSL certificates and infrastructure around renewing and revoking those certificates.
@@ -49,7 +49,7 @@ PEM and DER files was always a bit of a mystery to me, so I decided that writing
 scripts to do this would be a good learning experience. It definitely was.
 
 
-## How to use
+How to use
 
 1.  Make sure you are on a compatible system.
         You need Python (I used Python 2.7.10) and openssl (I used OpenSSL 1.0.2d-fips 9 Jul 2015)
@@ -86,7 +86,7 @@ Reconstruct public key (alternative method):
 10. Profit.
 
 
-## Educational component
+Educational component
 
 This code might be interesting to anyone interested in cryptography or networking
 who knows how to use PEM/DER files but for whom their contents may be a mystery.
@@ -281,7 +281,7 @@ http://pyasn1.sourceforge.net/codecs.html
 can encode and decode PyASN1 in an object oriented way, so I used it to do the heavy lifting.
 
 
-## Future work
+Future work
 
 Upon further research, the JSON format letsencrypt uses is actually a draft standard:
 https://tools.ietf.org/html/rfc7517
