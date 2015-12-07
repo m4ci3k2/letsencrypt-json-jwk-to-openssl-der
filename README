@@ -1,10 +1,8 @@
- letsencrypt-json-jwk-to-openssl-der
-(yes, I realize that's redundant, but keywords ftw)
+letsencrypt-json-jwk-to-openssl-der (yes, I realize that's redundant, but keywords ftw)
 
 (Re)construct OpenSSL-compatible RSA public and private keys from integer RSA parameters
 
 ;tldr
-
 The letsencrypt client requires root. letsencrypt-nosudo doesn't. letsencrypt generates
 and stores cryptographic keys in JSON, but letsencrypt-nosudo uses OpenSSL PEM files instead.
 These scripts create standard DER-encoded OpenSSL-compatible RSA public and private keys
