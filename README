@@ -51,10 +51,10 @@ How to use
 
 1.  Make sure you are on a compatible system.
         You need Python (I used Python 2.7.10) and openssl (I used OpenSSL 1.0.2d-fips 9 Jul 2015)
-        python >= 2.6.x (3.x probably works, but I haven't tested)
+        python >= 2.6.x (currently python-3 doesn't work)
         openssl >= 1.0.x (maybe earlier versions work)
 2.  Install dependencies
-        pip install PyASN1
+        pip install PyASN1 rsa
 3.  Find your private_key.json and regr.json files in /etc/letsencrypt/accounts/
 
 Reconstruct public key:

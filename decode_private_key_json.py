@@ -15,7 +15,7 @@ try:
     from pyasn1.type import univ, namedtype, tag
     from rsa.asn1 import AsnPubKey
 except ImportError:
-    print('This script requires PyASN1 to function. Try running: pip install PyASN1')
+    print('This script requires PyASN1 and rsa to function. Try running: pip install PyASN1 rsa')
     sys.exit(1)
 
 
